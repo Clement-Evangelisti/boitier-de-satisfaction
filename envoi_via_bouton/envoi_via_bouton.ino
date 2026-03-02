@@ -6,7 +6,7 @@
 // =====================
 SoftwareSerial e5(2, 3); // RX=D2, TX=D3  (module LoRa Wio-E5)
 
-#define DEVICE_NAME     "Cafet_Orion"   
+#define DEVICE_NAME "Cafet_Orion"   
 #define TX_INTERVAL_MS  5000         // Intervalle entre deux envois automatiques
 
 int counter = 0;
@@ -145,7 +145,7 @@ void loop() {
   bool etatVert = digitalRead(BTN_GREEN);
   if (etatVert == LOW && dernierEtatVert == HIGH) {
     ledVert();
-    sendLoRaMessage("{v," + String(DEVICE_NAME) + "}");
+    sendLoRaMessage("{device:" + String(DEVICE_NAME) + ",author:Anonyme, note:vert}");
     startListening();
     delay(50); // anti-rebond
   }
@@ -155,7 +155,7 @@ void loop() {
   bool etatRouge = digitalRead(BTN_RED);
   if (etatRouge == LOW && dernierEtatRouge == HIGH) {
     ledRouge();
-    sendLoRaMessage("{r," + String(DEVICE_NAME) + "}" );
+    sendLoRaMessage("{device:" + String(DEVICE_NAME) + ",author:Anonyme, note:rouge}" );
     startListening();
     delay(50); // anti-rebond
   }
