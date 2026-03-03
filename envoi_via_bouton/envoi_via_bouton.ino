@@ -11,7 +11,7 @@ LiquidCrystal lcd(4, 9, 10, 11, 12, 13);
 // =====================
 // ---- LoRa (Wio-E5) ----
 // =====================
-SoftwareSerial e5(2, 3);  // RX=D2, TX=D3
+SoftwareSerial e5(7, 8);  // RX=D2, TX=D3
 
 // =====================
 // ---- EEPROM ----
@@ -36,8 +36,8 @@ ChainableLED leds(5, 6, NUM_LEDS);  // Data=D5, Clock=D6
 // =====================
 // ---- Boutons ----
 // =====================
-#define BTN_VERT   7
-#define BTN_ROUGE  8
+#define BTN_VERT   2
+#define BTN_ROUGE  3
 
 // =====================
 // ---- Machine a etats ----
@@ -359,11 +359,13 @@ void message_envoye(bool satisfait) {
   if (satisfait) {
     lcd.print("Satisfait :)");
     ledVert();
-    sendLoRaMessage("{v," + deviceName + "}");
+    sendLoRaMessage("{device:" + String(deviceName) + ", note:vert}");
+    
+    
   } else {
     lcd.print("Non satisfait :(");
     ledRouge();
-    sendLoRaMessage("{r," + deviceName + "}");
+    sendLoRaMessage("{device:" + String(deviceName) + ", note:rouge}");
   }
   startListening();
   delay(3000);
