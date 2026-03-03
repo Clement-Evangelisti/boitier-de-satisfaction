@@ -5,7 +5,7 @@
 // =====================
 // Variables WIFI
 // =====================
-char ssid[] = "CESI_Iot";                                       // Nom du réseau
+char ssid[] = "CESI_Iot";
 char pass[] =  "#RO_i0t.n3t"; 
 int status = WL_IDLE_STATUS;
 
@@ -17,6 +17,8 @@ const int mqtt_port = 1883;
 const char* nameMQTT = "MQTT_Broker_Groupe_1";
 const char* topic_sub = "CESI/set_up";
 const char* topic_pub = "CESI/mesure_temp";
+const char* mqtt_user = "user1";
+const char* mqtt_password = "password";
 
 // =====================
 // Variables LoRa
@@ -137,7 +139,7 @@ void connectionMQTT() {
 
   while (!client.connected()) {
     Serial.print("Connexion au broker MQTT...");
-    if (client.connect(nameMQTT)) {
+    if (client.connect(nameMQTT, mqtt_user, mqtt_password)) {
       Serial.println("OK");
       client.subscribe(topic_sub);
       Serial.println("Abonné à CESI/set_up");
