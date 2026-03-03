@@ -1,6 +1,7 @@
 #include <LiquidCrystal.h>
 #include <SoftwareSerial.h>
 #include <ChainableLED.h>
+#include <EEPROM.h>
 
 // =====================
 // ---- LCD ----
@@ -12,7 +13,19 @@ LiquidCrystal lcd(4, 9, 10, 11, 12, 13);
 // =====================
 SoftwareSerial e5(2, 3);  // RX=D2, TX=D3
 
-#define DEVICE_NAME "Cafet_Orion"
+// =====================
+// ---- EEPROM ----
+// =====================
+// Adresse 0 : index du nom (0 = Cafet_Orion, 1 = Cafet_Cassio)
+// Adresse 1 : octet de validation (0xAB = données valides)
+#define EEPROM_ADDR_INDEX    0
+#define EEPROM_ADDR_VALID    1
+#define EEPROM_MAGIC         0xAB
+
+const char* nomsDisponibles[] = { "Cafet_Orion", "Cafet_Cassio" };
+const int   NB_NOMS = 2;
+
+String deviceName = "";  // Chargé depuis l'EEPROM au démarrage
 
 // =====================
 // ---- LED chainable ----
@@ -34,7 +47,7 @@ ChainableLED leds(5, 6, NUM_LEDS);  // Data=D5, Clock=D6
 // Utilisateur procède aux votes
 // Maintenance peut modifier les paramètres du boitier
 const char* modes[] = { "Admin", "Utilisateur", "Maintenance" };
-const int NB_MODES = 3;
+const int   NB_MODES = 3;
 
 enum Etat { ACCUEIL, SELECTION, VOTE };
 Etat etatActuel = ACCUEIL;
@@ -45,12 +58,34 @@ unsigned long dernierTemps = 0;
 const int DEBOUNCE = 200;
 
 
+// ============================================================
+// EEPROM : sauvegarde et chargement du device name
+// ============================================================
+
+void sauvegarderDeviceName(int index) {
+  EEPROM.write(EEPROM_ADDR_INDEX, (byte)index);
+  EEPROM.write(EEPROM_ADDR_VALID, EEPROM_MAGIC);
+}
+
+int chargerIndexDeviceName() {
+  byte magic = EEPROM.read(EEPROM_ADDR_VALID);
+  if (magic == EEPROM_MAGIC) {
+    byte index = EEPROM.read(EEPROM_ADDR_INDEX);
+    if (index < NB_NOMS) return (int)index;
+  }
+  // Première utilisation ou données corrompues → valeur par défaut
+  sauvegarderDeviceName(0);
+  return 0;
+}
+
+
+// ============================================================
+// LED helpers
+// ============================================================
+
 void ledVert()    { leds.setColorRGB(0,   0, 255,   0); }
 void ledRouge()   { leds.setColorRGB(0, 255,   0,   0); }
 void ledEteinte() { leds.setColorRGB(0,   0,   0,   0); }
-
-
-
 
 
 // ============================================================
@@ -68,8 +103,12 @@ void setup() {
   leds.init();
   ledEteinte();
 
+  // Chargement du device name depuis l'EEPROM
+  int idx = chargerIndexDeviceName();
+  deviceName = nomsDisponibles[idx];
+
   Serial.println("=== LCD + LORA P2P ===");
-  Serial.println("Appareil : " + String(DEVICE_NAME));
+  Serial.println("Appareil : " + deviceName);
 
   sendCmd("AT+MODE=TEST");
   delay(500);
@@ -133,6 +172,10 @@ void loop() {
 }
 
 
+// ============================================================
+// LoRa helpers
+// ============================================================
+
 void sendCmd(String cmd) {
   e5.println(cmd);
   delay(300);
@@ -145,7 +188,6 @@ void startListening() {
   Serial.println("[RX] En ecoute...");
 }
 
-// Envoi LoRa -- appele UNIQUEMENT depuis voter() pour l'utilisateur
 void sendLoRaMessage(String message) {
   Serial.println("[TX] Envoi : " + message);
   e5.print("AT+TEST=TXLRSTR,\"");
@@ -165,26 +207,32 @@ String hexToAscii(String hex) {
   return ascii;
 }
 
+
 // ============================================================
-// Affichages de l'ecran LCD
+// Affichages LCD
 // ============================================================
-void afficherAccueil() { // retour à l'acceuil
+
+void afficherAccueil() {
   lcd.clear();
   lcd.setCursor(0, 0); lcd.print("  Bienvenue !   ");
   lcd.setCursor(0, 1); lcd.print("Appuyer bouton..");
 }
 
-void afficherConfirmation() { // message de confirmation pour le type d'utilisateur choisi
+void afficherConfirmation() {
   lcd.clear();
   lcd.setCursor(0, 0); lcd.print("Mode choisi :");
   lcd.setCursor(0, 1); lcd.print(modes[modeIndex]);
 }
 
 
-bool demanderMotDePasse() { // mot de passe pour admin et maintenance
+// ============================================================
+// Mot de passe (Admin & Maintenance) : tenir VERT 3 secondes
+// ============================================================
+
+bool demanderMotDePasse() {
   lcd.clear();
   lcd.setCursor(0, 0); lcd.print("Mot de passe :");
-  lcd.setCursor(0, 1); lcd.print("Tenir vert 3sec"); // on affiche le mdp pour le proto
+  lcd.setCursor(0, 1); lcd.print("Tenir vert 3sec");
 
   while (true) {
     if (digitalRead(BTN_ROUGE) == LOW) {
@@ -212,16 +260,18 @@ bool demanderMotDePasse() { // mot de passe pour admin et maintenance
           return true;
         }
       }
-      // Relache trop tot
+      // Relâché trop tôt
       lcd.setCursor(0, 0); lcd.print("Mot de passe :");
       lcd.setCursor(0, 1); lcd.print("Tenir vert 3sec");
     }
   }
 }
 
+
 // ============================================================
-// Mode Admin qui a accès aux statistiques
+// Mode Admin : accès aux statistiques
 // ============================================================
+
 void modeAdmin() {
   lcd.clear();
   lcd.setCursor(0, 0); lcd.print("Statistiques");
@@ -235,25 +285,73 @@ void modeAdmin() {
   afficherAccueil();
 }
 
-// ============================================================
-// Mode Maintenance peut modifier des paramètres du boitier
-// ============================================================
-void modeMaintenance() {
-  lcd.clear();
-  lcd.setCursor(0, 0); lcd.print("Acces parametres");
-  lcd.setCursor(0, 1); lcd.print("                ");
 
-  while (digitalRead(BTN_VERT) == HIGH && digitalRead(BTN_ROUGE) == HIGH);
-  while (digitalRead(BTN_VERT) == LOW  || digitalRead(BTN_ROUGE) == LOW);
+// ============================================================
+// Mode Maintenance : modification du device name
+//   VERT  → basculer entre les noms disponibles
+//   ROUGE → confirmer et sauvegarder en EEPROM
+// ============================================================
+
+void modeMaintenance() {
+  // Retrouver l'index courant
+  int nomIndex = 0;
+  for (int i = 0; i < NB_NOMS; i++) {
+    if (deviceName == nomsDisponibles[i]) { nomIndex = i; break; }
+  }
+
+  // ← CORRECTION PRINCIPALE :
+  // Attendre que tous les boutons soient physiquement relâchés
+  // avant de commencer la sélection (le bouton ROUGE vient d'être
+  // utilisé pour valider le mot de passe et peut encore rebondir)
+  while (digitalRead(BTN_VERT) == LOW || digitalRead(BTN_ROUGE) == LOW);
   delay(DEBOUNCE);
+
+  // Affichage initial
+  lcd.clear();
+  lcd.setCursor(0, 0); lcd.print("Device name :");
+  lcd.setCursor(0, 1); lcd.print("> ");
+  lcd.print(nomsDisponibles[nomIndex]);
+
+  while (true) {
+
+    // VERT : changer de nom
+    if (digitalRead(BTN_VERT) == LOW) {
+      while (digitalRead(BTN_VERT) == LOW);   // attendre relâchement
+      delay(DEBOUNCE);
+      nomIndex = (nomIndex + 1) % NB_NOMS;
+
+      // Rafraîchir uniquement la ligne 2
+      lcd.setCursor(0, 1); lcd.print("> ");
+      lcd.print(nomsDisponibles[nomIndex]);
+      // Effacer le reste de la ligne
+      for (int j = 2 + strlen(nomsDisponibles[nomIndex]); j < 16; j++) lcd.print(" ");
+    }
+
+    // ROUGE : confirmer et sauvegarder
+    if (digitalRead(BTN_ROUGE) == LOW) {
+      while (digitalRead(BTN_ROUGE) == LOW);  // attendre relâchement
+      delay(DEBOUNCE);
+
+      deviceName = nomsDisponibles[nomIndex];
+      sauvegarderDeviceName(nomIndex);
+
+      lcd.clear();
+      lcd.setCursor(0, 0); lcd.print("Sauvegarde !");
+      lcd.setCursor(0, 1); lcd.print(deviceName);
+      Serial.println("[EEPROM] Device name sauvegarde : " + deviceName);
+      delay(2000);
+      break;
+    }
+  }
 
   etatActuel = ACCUEIL;
   afficherAccueil();
 }
 
 // ============================================================
-// Mode Utilisateur qui ne peut seulement envoyé un avis
+// Mode Utilisateur : envoi d'un avis
 // ============================================================
+
 void message_envoye(bool satisfait) {
   lcd.clear();
   lcd.setCursor(0, 0); lcd.print("Message envoye !");
@@ -261,11 +359,11 @@ void message_envoye(bool satisfait) {
   if (satisfait) {
     lcd.print("Satisfait :)");
     ledVert();
-    sendLoRaMessage("{v," + String(DEVICE_NAME) + "}");
+    sendLoRaMessage("{v," + deviceName + "}");
   } else {
     lcd.print("Non satisfait :(");
     ledRouge();
-    sendLoRaMessage("{r," + String(DEVICE_NAME) + "}");
+    sendLoRaMessage("{r," + deviceName + "}");
   }
   startListening();
   delay(3000);
@@ -306,9 +404,11 @@ void voter() {
   afficherAccueil();
 }
 
+
 // ============================================================
-// Selection du mode
+// Sélection du mode
 // ============================================================
+
 void afficherSelection() {
   lcd.clear();
 
@@ -347,7 +447,7 @@ void afficherSelection() {
         if (ok) modeAdmin();
         else { etatActuel = ACCUEIL; afficherAccueil(); }
 
-      } else if (modeIndex == 1) {   // Utilisateur -> envoi radio autorise
+      } else if (modeIndex == 1) {   // Utilisateur
         etatActuel = VOTE;
         voter();
 
@@ -361,5 +461,3 @@ void afficherSelection() {
     }
   }
 }
-
-
