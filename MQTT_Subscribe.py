@@ -22,8 +22,11 @@ def on_message(client, userdata, msg):
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
-        # Si ce n'est pas du JSON, on encapsule le message brut
-        payload = {"device": "inconnu", "message": raw}
+        print("Erreur de parsing JSON")
+        payload = {}
+        
+    # Ajout d'un timestamp
+    payload["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Chargement du fichier existant ou création d'une liste vide
     if os.path.exists(JSON_FILE):
