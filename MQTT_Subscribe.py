@@ -7,6 +7,8 @@ MQTT_SERVER = "192.168.1.57"
 MQTT_PORT   = 1883
 MQTT_TOPIC  = "CESI/mesure_temp"
 JSON_FILE   = "donnees.json"
+MQTT_USER = "user1"
+MQTT_PWD = "password"
 
 def on_connect(client, userdata, flags, rc):
     print("Connecté au broker MQTT")
@@ -38,6 +40,8 @@ def on_message(client, userdata, msg):
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
+
+client.username_pw_set(MQTT_USER, MQTT_PWD)
 
 client.connect(MQTT_SERVER, MQTT_PORT)
 client.loop_forever()
