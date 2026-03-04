@@ -46,7 +46,7 @@ ChainableLED leds(5, 6, NUM_LEDS);  // Data=D5, Clock=D6
 // Admin a accès aux statistiques
 // Utilisateur procède aux votes
 // Maintenance peut modifier les paramètres du boitier
-const char* modes[] = { "Admin", "Utilisateur", "Maintenance" };
+const char* modes[] = { "Utilisateur", "Admin", "Maintenance" };
 const int   NB_MODES = 3;
 
 enum Etat { ACCUEIL, SELECTION, VOTE };
