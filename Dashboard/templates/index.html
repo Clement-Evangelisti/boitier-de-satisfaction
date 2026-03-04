@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Cafétéria</title>
+
+<!-- Graphiques via :contentReference[oaicite:0]{index=0} -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+    font-family: Arial;
+    background:#f5f6fa;
+    padding:40px;
+}
+
+h1{
+    text-align:center;
+    margin-bottom:30px;
+}
+
+.card{
+    background:white;
+    padding:25px;
+    margin-bottom:30px;
+    border-radius:12px;
+    box-shadow:0 5px 20px rgba(0,0,0,0.1);
+}
+
+table{
+    width:100%;
+    border-collapse: collapse;
+}
+
+th, td{
+    padding:12px;
+    text-align:center;
+}
+
+th{
+    background:#2f3640;
+    color:white;
+}
+
+tr:nth-child(even){
+    background:#f1f2f6;
+}
+
+.note1{ background:#ff7675; color:white; font-weight:bold;}
+.note2{ background:#fdcb6e; font-weight:bold;}
+.note3{ background:#55efc4; font-weight:bold;}
+
+.badge{
+    padding:6px 10px;
+    border-radius:8px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>📊 Dashboard Cafétéria CESI</h1>
+
+<!-- ========= GRAPHIQUE ========= -->
+<div class="card">
+<h2>Répartition des notes</h2>
+<canvas id="chart" height="100"></canvas>
+</div>
+
+<!-- ========= HISTORIQUE ========= -->
+<div class="card">
+<h2>Historique des votes</h2>
+
+<table>
+<thead>
+<tr>
+<th>Appareil</th>
+<th>Note</th>
+<th>Heure</th>
+</tr>
+</thead>
+<tbody id="table"></tbody>
+</table>
+
+</div>
+
+<script>
+let chart;
+
+function createChart(){
+const ctx = document.getElementById('chart');
+
+chart = new Chart(ctx, {
+type: 'bar',
+data: {
+labels: ['Insatisfait','Satisfait'],
+datasets: [{
+label: 'Nombre de votes',
+data: [0,0]
+}]
+},
+options:{
+plugins:{ legend:{display:false}},
+scales:{ y:{beginAtZero:true}}
+}
+});
+}
+
+function loadData(){
+fetch("/data")
+.then(r=>r.json())
+.then(data=>{
+
+let html="";
+let count1=0, count2=0;
+
+data.slice().reverse().forEach(d=>{
+
+if(d.note=="rouge") count1++;
+if(d.note=="vert") count2++;
+
+
+let cls="note"+d.note;
+
+html+=`
+<tr>
+<td>${d.device}</td>
+<td><span class="badge ${cls}">${d.note}</span></td>
+<td>${d.timestamp}</td>
+</tr>`;
+});
+
+document.getElementById("table").innerHTML=html;
+
+chart.data.datasets[0].data=[count1,count2];
+chart.update();
+});
+}
+
+createChart();
+setInterval(loadData,2000);
+loadData();
+</script>
+
+</body>
+</html>
