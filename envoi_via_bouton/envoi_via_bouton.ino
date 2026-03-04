@@ -300,9 +300,17 @@ void startListening() {
 
 void sendLoRaMessage(String message) {
   Serial.println("[TX] Envoi : " + message);
-  e5.print("AT+TEST=TXLRSTR,\"");
-  e5.print(message);
+  String hex = "";
+  for (int i = 0; i < message.length(); i++) {
+    char buf[3];
+    sprintf(buf, "%02X", (unsigned char)message[i]);
+    hex += buf;
+  }
+  Serial.println("[TX] Hex : " + hex);
+  e5.print("AT+TEST=TXLRPKT,\"");
+  e5.print(hex);
   e5.println("\"");
+  
   delay(700);
   while (e5.available()) Serial.write(e5.read());
   Serial.println();
@@ -453,13 +461,11 @@ void message_envoye(bool satisfait) {
   if (satisfait) {
     lcd.print("Satisfait :)");
     ledVert();
-    sendLoRaMessage('{"device": "' + String(deviceName) + '", "note": "vert"}');
-    
-    
+    sendLoRaMessage("{\"device\": \"" + String(deviceName) + "\", \"note\": \"vert\"}");
   } else {
     lcd.print("Non satisfait :(");
     ledRouge();
-    sendLoRaMessage('{"device": "' + String(deviceName) + '", "note": "rouge"}');
+    sendLoRaMessage("{\"device\": \"" + String(deviceName) + "\", \"note\": \"rouge\"}");
   }
   startListening();
   delay(3000);
@@ -540,13 +546,12 @@ void afficherSelection() {
       delay(2000);
 
       if (modeIndex == 0) {
+        etatActuel = VOTE;
+        voter();
+      } else if (modeIndex == 1) {
         bool ok = demanderMotDePasse();
         if (ok) modeAdmin();
         else { etatActuel = ACCUEIL; afficherAccueil(); }
-
-      } else if (modeIndex == 1) {
-        etatActuel = VOTE;
-        voter();
 
       } else if (modeIndex == 2) {
         bool ok = demanderMotDePasse();
