@@ -112,17 +112,7 @@ void afficherScreensaver() {
 // ============================================================
 // Mode economie d'energie simule
 //
-// Strategie :
-//   1. Eteindre la LED (consommateur principal apres le MCU)
-//   2. Garder le LCD allume avec screensaver (feedback utilisateur)
-//      -> Pour eteindre completement le LCD : remplacer par lcd.noDisplay()
-//   3. Augmenter l'intervalle de polling des boutons (50ms au lieu de continu)
-//   4. Bloquer jusqu'a appui bouton
-//
-// Consommation estimee reduite vs mode actif :
-//   - LED ChainableLED eteinte     : -20 mA environ
-//   - Pas de calcul LoRa/Serial    : CPU moins sollicite
-//   - delay(50) dans la boucle     : moins de cycles CPU actifs
+
 //
 // Reveil : appui sur BTN_VERT ou BTN_ROUGE
 // ============================================================
