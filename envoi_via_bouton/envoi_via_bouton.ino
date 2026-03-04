@@ -359,13 +359,13 @@ void message_envoye(bool satisfait) {
   if (satisfait) {
     lcd.print("Satisfait :)");
     ledVert();
-    sendLoRaMessage("{device:" + String(deviceName) + ", note:vert}");
+    sendLoRaMessage('{"device": "' + String(deviceName) + '", "note": "vert"}');
     
     
   } else {
     lcd.print("Non satisfait :(");
     ledRouge();
-    sendLoRaMessage("{device:" + String(deviceName) + ", note:rouge}");
+    sendLoRaMessage('{"device": "' + String(deviceName) + '", "note": "rouge"}');
   }
   startListening();
   delay(3000);
