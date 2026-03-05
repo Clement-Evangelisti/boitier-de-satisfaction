@@ -20,6 +20,9 @@ SoftwareSerial e5(7, 8);  // RX=D7, TX=D8
 #define EEPROM_ADDR_VALID  1
 #define EEPROM_MAGIC       0xAB
 
+#define SECRET_KEY "ORION" // clé de chiffrement
+
+
 const char* nomsDisponibles[] = { "Cafet_Orion", "Cafet_Cassio" };
 const int   NB_NOMS = 2;
 String deviceName = "";
@@ -100,7 +103,7 @@ void afficherScreensaver() {
 
   // Ligne 1 : "z" qui se deplace de gauche a droite
   lcd.setCursor(0, 1);
-  lcd.print("                ");   // effacer la ligne
+  lcd.print("                ");   
   lcd.setCursor(positionZZZ, 1);
   switch (frame % 3) {
     case 0: lcd.print("z");   break;
@@ -262,31 +265,53 @@ void sendCmd(String cmd) {
 }
 
 
+
+// ============================================================
+// Chiffrement XOR avec la clé SECRET_KEY
+// ============================================================
+String chiffrer(String message) {
+  String result = message;
+  int keyLen = strlen(SECRET_KEY);
+  for (int i = 0; i < (int)message.length(); i++) {
+    result[i] = message[i] ^ SECRET_KEY[i % keyLen];
+  }
+  return result;
+}
+
+
 void sendLoRaMessage(String message) {
-  Serial.println("[TX] Envoi : " + message);
+ 
+  Serial.println("[TX] Clair  : " + message);
+
+  // chiffrement XOR
+  String chiffre = chiffrer(message);
+
+  //Message chiffré 
+  Serial.print("[TX] Chiffre: ");
+  for (int i = 0; i < (int)chiffre.length(); i++) {
+    Serial.print("\\x");
+    if ((unsigned char)chiffre[i] < 0x10) Serial.print("0");
+    Serial.print((unsigned char)chiffre[i], HEX);
+  }
+  Serial.println();
+
+  // Conversion en hex pour l'envoi
   String hex = "";
-  for (int i = 0; i < message.length(); i++) {
+  for (int i = 0; i < (int)chiffre.length(); i++) {
     char buf[3];
-    sprintf(buf, "%02X", (unsigned char)message[i]);
+    sprintf(buf, "%02X", (unsigned char)chiffre[i]);
     hex += buf;
   }
-  Serial.println("[TX] Hex : " + hex);
+  Serial.println("[TX] Hex    : " + hex);
+
+  // Envoi 
   e5.print("AT+TEST=TXLRPKT,\"");
   e5.print(hex);
   e5.println("\"");
-  
+
   delay(700);
   while (e5.available()) Serial.write(e5.read());
   Serial.println();
-}
-
-String hexToAscii(String hex) {
-  String ascii = "";
-  for (int i = 0; i < (int)hex.length(); i += 2) {
-    String byteStr = hex.substring(i, i + 2);
-    ascii += (char)strtol(byteStr.c_str(), NULL, 16);
-  }
-  return ascii;
 }
 
 
@@ -307,7 +332,7 @@ void afficherConfirmation() {
 
 
 // ============================================================
-// Mot de passe : tenir VERT 3 secondes
+// Mot de passe : tenir VERT 3 secondes pour simuler le mot de passe
 // ============================================================
 bool demanderMotDePasse() {
   lcd.clear();
