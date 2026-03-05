@@ -454,11 +454,11 @@ bool authentifierUtilisateur() {
 
   lcd.clear();
 
-  // ✅ FIX : attendre que les boutons soient bien relâchés avant de commencer
+ 
   while (digitalRead(BTN_VERT) == LOW || digitalRead(BTN_ROUGE) == LOW);
   delay(300);
 
-  // ✅ FIX : afficher la question immédiatement sans attendre le premier intervalle
+  
   lcd.setCursor(0, 0);
   lcd.print(loopQ.substring(0, lcdWidth));
   lcd.setCursor(0, 1); lcd.print("Vrt=Oui Rge=Non ");
