@@ -26,9 +26,6 @@ const char* mqtt_password = "password";
 SoftwareSerial e5(2, 3); // RX, TX
 #define DEVICE_NAME "MQTT_Broker_Groupe_1"
 
-//clé XOR
-#define SECRET_KEY "ORION"
-
 // =====================
 // Objets communication
 // =====================
@@ -85,41 +82,29 @@ void loop() {
       Serial.println(response);
     }
 
+    if (response.startsWith("+TEST: RX")) {
+      int start = response.indexOf('"');
+      int end   = response.lastIndexOf('"');
+      if (start != -1 && end != -1 && end > start) {
+        String hexPayload = response.substring(start + 1, end);
+        String message = hexToAscii(hexPayload);
+        Serial.println(">>> MESSAGE RECU : " + message);
+        Serial.println("---------------------");
 
-  if (response.startsWith("+TEST: RX")) {
-  int start = response.indexOf('"');
-  int end   = response.lastIndexOf('"');
-  if (start != -1 && end != -1 && end > start) {
-    String hexPayload = response.substring(start + 1, end);
-
-    // mess en hex brut
-    Serial.println("[RX] Hex     : " + hexPayload);
-
-    //Mess chiffré 
-    String messageChiffre = hexToAscii(hexPayload);
-    Serial.print("[RX] Chiffre : ");
-    for (int i = 0; i < (int)messageChiffre.length(); i++) {
-      Serial.print("\\x");
-      if ((unsigned char)messageChiffre[i] < 0x10) Serial.print("0");
-      Serial.print((unsigned char)messageChiffre[i], HEX);
-    }
-    Serial.println();
-
-    // message déchiffré 
-    String messageClair = dechiffrer(messageChiffre);
-    Serial.println("[RX] Clair   : " + messageClair);
-    Serial.println("---------------------");
-
-    
-    publish(topic_pub, messageClair.c_str());
+        // Publication du message LoRa sur le broker MQTT
+        publish(topic_pub, message.c_str());
       }
     }
-
-
-
   }
 
-
+  // --- Envoi manuel depuis le Serial Monitor ---
+  if (Serial.available()) {
+    String userInput = Serial.readStringUntil('\n');
+    userInput.trim();
+    if (userInput.length() > 0) {
+      publish(topic_pub, userInput.c_str());
+    }
+  }
 }
 
 // =====================
@@ -218,16 +203,4 @@ String hexToAscii(String hex) {
     ascii += c;
   }
   return ascii;
-}
-
-
-
-// Déchiffrement XOR 
-String dechiffrer(String message) {
-  String result = message;
-  int keyLen = strlen(SECRET_KEY);
-  for (int i = 0; i < (int)message.length(); i++) {
-    result[i] = message[i] ^ SECRET_KEY[i % keyLen];
-  }
-  return result;
 }
