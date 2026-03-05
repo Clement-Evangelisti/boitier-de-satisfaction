@@ -27,6 +27,11 @@ SoftwareSerial e5(2, 3); // RX, TX
 #define DEVICE_NAME "MQTT_Broker_Groupe_1"
 
 // =====================
+// Chiffrement XOR
+// =====================
+#define SECRET_KEY "ORION"
+
+// =====================
 // Objets communication
 // =====================
 WiFiClient espClient;
@@ -42,6 +47,19 @@ void callback(char* topic, byte* payload, unsigned int length);
 void startListening();
 void sendCmd(String cmd);
 String hexToAscii(String hex);
+String dechiffrer(String message);
+
+// ============================================================
+// Déchiffrement XOR (identique au chiffrement, XOR est symétrique)
+// ============================================================
+String dechiffrer(String message) {
+  String result = message;
+  int keyLen = strlen(SECRET_KEY);
+  for (int i = 0; i < (int)message.length(); i++) {
+    result[i] = message[i] ^ SECRET_KEY[i % keyLen];
+  }
+  return result;
+}
 
 // =====================
 void setup() {
@@ -87,22 +105,28 @@ void loop() {
       int end   = response.lastIndexOf('"');
       if (start != -1 && end != -1 && end > start) {
         String hexPayload = response.substring(start + 1, end);
-        String message = hexToAscii(hexPayload);
-        Serial.println(">>> MESSAGE RECU : " + message);
+
+        // 1. Message en hex brut
+        Serial.println("[RX] Hex     : " + hexPayload);
+
+        // 2. Message chiffré (bytes reçus)
+        String messageChiffre = hexToAscii(hexPayload);
+        Serial.print("[RX] Chiffre : ");
+        for (int i = 0; i < (int)messageChiffre.length(); i++) {
+          Serial.print("\\x");
+          if ((unsigned char)messageChiffre[i] < 0x10) Serial.print("0");
+          Serial.print((unsigned char)messageChiffre[i], HEX);
+        }
+        Serial.println();
+
+        // 3. Message déchiffré en clair
+        String messageClair = dechiffrer(messageChiffre);
+        Serial.println("[RX] Clair   : " + messageClair);
         Serial.println("---------------------");
 
-        // Publication du message LoRa sur le broker MQTT
-        publish(topic_pub, message.c_str());
+        // Publication MQTT du message déchiffré
+        publish(topic_pub, messageClair.c_str());
       }
-    }
-  }
-
-  // --- Envoi manuel depuis le Serial Monitor ---
-  if (Serial.available()) {
-    String userInput = Serial.readStringUntil('\n');
-    userInput.trim();
-    if (userInput.length() > 0) {
-      publish(topic_pub, userInput.c_str());
     }
   }
 }
