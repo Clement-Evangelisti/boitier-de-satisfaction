@@ -22,7 +22,6 @@ SoftwareSerial e5(7, 8);  // RX=D7, TX=D8
 
 #define SECRET_KEY "ORION" // clé de chiffrement
 
-
 const char* nomsDisponibles[] = { "Cafet_Orion", "Cafet_Cassio" };
 const int   NB_NOMS = 2;
 String deviceName = "";
@@ -42,10 +41,6 @@ ChainableLED leds(5, 6, NUM_LEDS);
 // =====================
 // ---- Machine a etats ----
 // =====================
-// trois mode d'utilisateurs disponible
-// Admin a accès aux statistiques
-// Utilisateur procède aux votes
-// Maintenance peut modifier les paramètres du boitier
 const char* modes[] = { "Utilisateur", "Admin", "Maintenance" };
 const int   NB_MODES = 3;
 
@@ -58,18 +53,23 @@ int modeIndex = 0;
 // ---- Gestion du temps et de la veille ----
 // =====================
 #define DEBOUNCE        200
-#define DELAI_VEILLE    15000UL   // 15 secondes d'inactivite
+#define DELAI_VEILLE    15000UL
 
-// =====================
-// ---- Mode eco : niveaux d'animation LCD ----
-// =====================
-
-#define ANIM_INTERVAL   800UL     // Intervalle rafraichissement screensaver (ms)
-#define POLL_VEILLE     50UL      // Intervalle polling boutons en veille (ms)
+#define ANIM_INTERVAL   800UL
+#define POLL_VEILLE     50UL
 
 unsigned long dernierTemps    = 0;
 unsigned long dernierActivite = 0;
 bool          enVeille        = false;
+
+// =====================
+// ---- Utilisateurs et questions secrètes ----
+// La bonne réponse est toujours OUI (bouton VERT)
+// =====================
+const char* userNames[]     = { "User_1",            "User_2",         "User_3"                };
+const char* userQuestions[] = { "Aimes-tu le cafe?", "Es-tu matinal?", "Manges-tu a la cafet?" };
+const bool  userReponses[]  = { true,                true,             true                    };
+const int   NB_USERS        = 3;
 
 
 // ============================================================
@@ -89,21 +89,17 @@ void ledEteinte() { leds.setColorRGB(0,   0,   0,   0); }
 
 
 // ============================================================
-// Screensaver : animation "Z Z Z" qui defile sur le LCD
-// Donne un feedback visuel que l'appareil est en veille
-// mais reste receptif aux boutons
+// Screensaver
 // ============================================================
 void afficherScreensaver() {
-  static int    frame        = 0;
-  static int    positionZZZ  = 0;
+  static int frame       = 0;
+  static int positionZZZ = 0;
 
-  // Ligne 0 : message fixe
   lcd.setCursor(0, 0);
   lcd.print("  -- VEILLE --  ");
 
-  // Ligne 1 : "z" qui se deplace de gauche a droite
   lcd.setCursor(0, 1);
-  lcd.print("                ");   
+  lcd.print("                ");
   lcd.setCursor(positionZZZ, 1);
   switch (frame % 3) {
     case 0: lcd.print("z");   break;
@@ -111,62 +107,42 @@ void afficherScreensaver() {
     case 2: lcd.print("zzz"); break;
   }
 
-  positionZZZ = (positionZZZ + 1) % 14;  // defilement sur 14 colonnes
+  positionZZZ = (positionZZZ + 1) % 14;
   frame++;
 }
 
 
 // ============================================================
-// Mode economie d'energie simule
-//
-
-//
-// Reveil : appui sur BTN_VERT ou BTN_ROUGE
+// Mode veille
 // ============================================================
 void mettreEnVeille() {
-  if (enVeille) return;   // Evite une double entree
+  if (enVeille) return;
   enVeille = true;
 
   Serial.println("[ECO] Inactivite -> mode economie d'energie");
   Serial.flush();
 
-  // Eteindre la LED (economie principale)
   ledEteinte();
-
-  // Optionnel : pour eteindre completement le retro-eclairage LCD
-  // decommentez la ligne ci-dessous (aucun feedback visuel)
-  // lcd.noDisplay();
 
   unsigned long dernierAnim = 0;
 
-  // Boucle de veille : polling lent, screensaver anime
   while (true) {
     unsigned long maintenant = millis();
 
-    // Rafraichir le screensaver a intervalle reduit
     if (maintenant - dernierAnim >= ANIM_INTERVAL) {
       afficherScreensaver();
       dernierAnim = maintenant;
     }
 
-    // Verifier les boutons de reveil
     if (digitalRead(BTN_VERT) == LOW || digitalRead(BTN_ROUGE) == LOW) {
-      break;    // Sortie de la veille
+      break;
     }
 
-    // Attente courte : reduit la charge CPU sans bloquer les boutons
     delay(POLL_VEILLE);
   }
 
-  // --- REVEIL ---
   enVeille = false;
-
-  // Optionnel : si lcd.noDisplay() utilise plus haut, rallumer ici
-  // lcd.display();
-
-  // Anti-rebond apres reveil
   delay(DEBOUNCE);
-
   resetInactivite();
   Serial.println("[ECO] Reveille par bouton !");
 }
@@ -217,7 +193,6 @@ void setup() {
   sendCmd("AT+TEST=RFCFG,868.35,SF7,125,12,15,14");
   delay(500);
 
-
   resetInactivite();
   afficherAccueil();
 }
@@ -228,7 +203,6 @@ void setup() {
 // ============================================================
 void loop() {
 
-  // --- Timeout 15s depuis l'accueil : passage en eco ---
   if (etatActuel == ACCUEIL) {
     if (millis() - dernierActivite >= DELAI_VEILLE) {
       mettreEnVeille();
@@ -237,8 +211,6 @@ void loop() {
     }
   }
 
-
-  // --- Navigation accueil ---
   unsigned long maintenant = millis();
   if (maintenant - dernierTemps < DEBOUNCE) return;
 
@@ -265,7 +237,6 @@ void sendCmd(String cmd) {
 }
 
 
-
 // ============================================================
 // Chiffrement XOR avec la clé SECRET_KEY
 // ============================================================
@@ -280,13 +251,13 @@ String chiffrer(String message) {
 
 
 void sendLoRaMessage(String message) {
- 
+  // 1. Message en clair
   Serial.println("[TX] Clair  : " + message);
 
-  // chiffrement XOR
+  // 2. Chiffrement XOR
   String chiffre = chiffrer(message);
 
-  //Message chiffré 
+  // 3. Affichage du message chiffré
   Serial.print("[TX] Chiffre: ");
   for (int i = 0; i < (int)chiffre.length(); i++) {
     Serial.print("\\x");
@@ -295,7 +266,7 @@ void sendLoRaMessage(String message) {
   }
   Serial.println();
 
-  // Conversion en hex pour l'envoi
+  // 4. Conversion en hex pour l'envoi LoRa
   String hex = "";
   for (int i = 0; i < (int)chiffre.length(); i++) {
     char buf[3];
@@ -304,7 +275,7 @@ void sendLoRaMessage(String message) {
   }
   Serial.println("[TX] Hex    : " + hex);
 
-  // Envoi 
+  // 5. Envoi LoRa
   e5.print("AT+TEST=TXLRPKT,\"");
   e5.print(hex);
   e5.println("\"");
@@ -332,7 +303,7 @@ void afficherConfirmation() {
 
 
 // ============================================================
-// Mot de passe : tenir VERT 3 secondes pour simuler le mot de passe
+// Mot de passe : tenir VERT 3 secondes
 // ============================================================
 bool demanderMotDePasse() {
   lcd.clear();
@@ -441,7 +412,111 @@ void modeMaintenance() {
 
 
 // ============================================================
-// Mode Utilisateur : vote + envoi LoRa
+// Authentification utilisateur : choix user + question secrète
+// La bonne réponse est toujours OUI (bouton VERT)
+// En cas d'erreur : message + LED rouge + retour accueil
+// ============================================================
+bool authentifierUtilisateur() {
+  int userIndex = 0;
+
+  // --- Étape 1 : choisir l'utilisateur ---
+  // VERT = défiler, ROUGE = confirmer
+  lcd.clear();
+  lcd.setCursor(0, 0); lcd.print("Choisir user :");
+  lcd.setCursor(0, 1); lcd.print("> "); lcd.print(userNames[userIndex]);
+
+  while (true) {
+    resetInactivite();
+
+    if (digitalRead(BTN_VERT) == LOW) {
+      while (digitalRead(BTN_VERT) == LOW);
+      delay(DEBOUNCE);
+      userIndex = (userIndex + 1) % NB_USERS;
+      lcd.setCursor(0, 1); lcd.print("                ");
+      lcd.setCursor(0, 1); lcd.print("> "); lcd.print(userNames[userIndex]);
+    }
+
+    if (digitalRead(BTN_ROUGE) == LOW) {
+      while (digitalRead(BTN_ROUGE) == LOW);
+      delay(DEBOUNCE);
+      break;
+    }
+  }
+
+  // --- Étape 2 : question secrète avec défilement ---
+  // VERT = OUI (bonne réponse), ROUGE = NON (mauvaise réponse)
+  String question      = String(userQuestions[userIndex]) + "      ";
+  String loopQ         = question + question;
+  int    lcdWidth      = 16;
+  int    i             = 0;
+  bool   answered      = false;
+  bool   correct       = false;
+
+  lcd.clear();
+
+  // ✅ FIX : attendre que les boutons soient bien relâchés avant de commencer
+  while (digitalRead(BTN_VERT) == LOW || digitalRead(BTN_ROUGE) == LOW);
+  delay(300);
+
+  // ✅ FIX : afficher la question immédiatement sans attendre le premier intervalle
+  lcd.setCursor(0, 0);
+  lcd.print(loopQ.substring(0, lcdWidth));
+  lcd.setCursor(0, 1); lcd.print("Vrt=Oui Rge=Non ");
+
+  // Réinitialiser le timer APRÈS le premier affichage
+  unsigned long dernierScroll = millis();
+
+  while (!answered) {
+    resetInactivite();
+
+    if (millis() - dernierScroll >= 480) {
+      lcd.setCursor(0, 0);
+      lcd.print(loopQ.substring(i % question.length(), i % question.length() + lcdWidth));
+      lcd.setCursor(0, 1); lcd.print("Vrt=Oui Rge=Non ");
+      i++;
+      dernierScroll = millis();
+    }
+
+    // VERT = OUI = bonne réponse
+    if (digitalRead(BTN_VERT) == LOW) {
+      while (digitalRead(BTN_VERT) == LOW);
+      delay(DEBOUNCE);
+      correct  = true;
+      answered = true;
+    }
+
+    // ROUGE = NON = mauvaise réponse
+    if (digitalRead(BTN_ROUGE) == LOW) {
+      while (digitalRead(BTN_ROUGE) == LOW);
+      delay(DEBOUNCE);
+      correct  = false;
+      answered = true;
+    }
+  }
+
+  // --- Étape 3 : feedback ---
+  lcd.clear();
+  if (correct) {
+    lcd.setCursor(0, 0); lcd.print("Bonne reponse !");
+    lcd.setCursor(0, 1); lcd.print("Bienvenu ");
+    lcd.print(userNames[userIndex]);
+    delay(2000);
+    return true;
+  } else {
+    lcd.setCursor(0, 0); lcd.print("Mauvaise reponse");
+    lcd.setCursor(0, 1); lcd.print("Acces refuse !");
+    ledRouge();
+    delay(2000);
+    ledEteinte();
+    etatActuel = ACCUEIL;
+    afficherAccueil();
+    return false;
+  }
+}
+
+
+// ============================================================
+// Envoi du message après vote
 // ============================================================
 void message_envoye(bool satisfait) {
   lcd.clear();
@@ -461,7 +536,16 @@ void message_envoye(bool satisfait) {
   ledEteinte();
 }
 
+
+// ============================================================
+// Mode Utilisateur : authentification puis vote et envoi 
+// ============================================================
 void voter() {
+
+  // --- Authentification : si echec, retour accueil direct ---
+  if (!authentifierUtilisateur()) return;
+
+  // --- Vote ---
   String message  = "Etes-vous satisfait ?  ";
   String loop1    = message + message;
   int    lcdWidth = 16;
@@ -541,7 +625,6 @@ void afficherSelection() {
         bool ok = demanderMotDePasse();
         if (ok) modeAdmin();
         else { etatActuel = ACCUEIL; afficherAccueil(); }
-
       } else if (modeIndex == 2) {
         bool ok = demanderMotDePasse();
         if (ok) modeMaintenance();
