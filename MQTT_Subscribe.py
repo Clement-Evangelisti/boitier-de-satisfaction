@@ -5,7 +5,7 @@ from datetime import datetime
 
 MQTT_SERVER = "192.168.1.57"
 MQTT_PORT   = 8883
-MQTT_TOPIC  = "CESI/mesure_temp"
+MQTT_TOPIC  = "CESI/BATIMENT/CAFET"
 JSON_FILE   = r"Dashboard\donnees.json"
 MQTT_USER = "user1"
 MQTT_PWD = "password"

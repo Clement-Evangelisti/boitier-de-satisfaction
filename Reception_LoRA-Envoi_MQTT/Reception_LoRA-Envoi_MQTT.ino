@@ -15,8 +15,8 @@ int status = WL_IDLE_STATUS;
 const char* mqtt_server = "192.168.1.57";
 const int mqtt_port = 8883;
 const char* nameMQTT = "MQTT_Broker_Groupe_1";
-const char* topic_sub = "CESI/set_up";
-const char* topic_pub = "CESI/mesure_temp";
+const char* topic_sub = "CESI/ACK";
+const char* topic_pub = "CESI/BATIMENT/CAFET";
 const char* mqtt_user = "user1";
 const char* mqtt_password = "password";
 
@@ -142,7 +142,7 @@ void connectionMQTT() {
     if (client.connect(nameMQTT, mqtt_user, mqtt_password)) {
       Serial.println("OK");
       client.subscribe(topic_sub);
-      Serial.println("Abonné à CESI/set_up");
+      Serial.println("Abonné à CESI/ACK");
       client.setCallback(callback);
     } else {
       Serial.print("Erreur MQTT, rc=");
