@@ -211,7 +211,7 @@ void setup() {
   pinMode(BTN_VERT,  INPUT_PULLUP);
   pinMode(BTN_ROUGE, INPUT_PULLUP);
 
-  // Attacher les interruptions sur FALLING (bouton appuyé avec INPUT_PULLUP)
+  // Attacher les interruptions sur FALLING
   attachInterrupt(digitalPinToInterrupt(BTN_VERT),  isrBtnVert,  FALLING);
   attachInterrupt(digitalPinToInterrupt(BTN_ROUGE), isrBtnRouge, FALLING);
 
@@ -339,7 +339,6 @@ void afficherConfirmation() {
 
 // ============================================================
 // Mot de passe : tenir VERT 3 secondes
-// (garde digitalRead : logique de maintien incompatible ISR)
 // ============================================================
 bool demanderMotDePasse() {
   lcd.clear();
