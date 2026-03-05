@@ -55,7 +55,7 @@ int modeIndex = 0;
 // ---- Gestion du temps et de la veille ----
 // =====================
 #define DEBOUNCE        200
-#define DELAI_VEILLE    15000UL   // 30 secondes d'inactivite
+#define DELAI_VEILLE    15000UL   // 15 secondes d'inactivite
 
 // =====================
 // ---- Mode eco : niveaux d'animation LCD ----
@@ -213,7 +213,7 @@ void setup() {
   delay(500);
   sendCmd("AT+TEST=RFCFG,868.35,SF7,125,12,15,14");
   delay(500);
-  startListening();
+
 
   resetInactivite();
   afficherAccueil();
@@ -225,7 +225,7 @@ void setup() {
 // ============================================================
 void loop() {
 
-  // --- Timeout 30s depuis l'accueil : passage en eco ---
+  // --- Timeout 15s depuis l'accueil : passage en eco ---
   if (etatActuel == ACCUEIL) {
     if (millis() - dernierActivite >= DELAI_VEILLE) {
       mettreEnVeille();
@@ -234,38 +234,6 @@ void loop() {
     }
   }
 
-  // --- Lecture LoRa ---
-  if (e5.available()) {
-    String response = e5.readStringUntil('\n');
-    response.trim();
-
-    if (response.length() > 0) {
-      Serial.print("[LoRa brut] ");
-      Serial.println(response);
-    }
-
-    if (response.startsWith("+TEST: RX")) {
-      int start = response.indexOf('"');
-      int end   = response.lastIndexOf('"');
-      if (start != -1 && end != -1 && end > start) {
-        String hexPayload = response.substring(start + 1, end);
-        String message = hexToAscii(hexPayload);
-        Serial.println(">>> MESSAGE RECU : " + message);
-        if      (message == "vert")  ledVert();
-        else if (message == "rouge") ledRouge();
-      }
-    }
-  }
-
-  // --- Envoi manuel Serial Monitor ---
-  if (Serial.available()) {
-    String userInput = Serial.readStringUntil('\n');
-    userInput.trim();
-    if (userInput.length() > 0) {
-      sendLoRaMessage(userInput);
-      startListening();
-    }
-  }
 
   // --- Navigation accueil ---
   unsigned long maintenant = millis();
@@ -293,10 +261,6 @@ void sendCmd(String cmd) {
   Serial.println();
 }
 
-void startListening() {
-  sendCmd("AT+TEST=RXLRPKT");
-  Serial.println("[RX] En ecoute...");
-}
 
 void sendLoRaMessage(String message) {
   Serial.println("[TX] Envoi : " + message);
@@ -467,7 +431,7 @@ void message_envoye(bool satisfait) {
     ledRouge();
     sendLoRaMessage("{\"device\": \"" + String(deviceName) + "\", \"note\": \"rouge\"}");
   }
-  startListening();
+
   delay(3000);
   ledEteinte();
 }
